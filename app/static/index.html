@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Homework</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      font-family: Inter, system-ui, sans-serif;
+      --bg-app: #120404;
+      --bg-sidebar: #1a0606;
+      --bg-card: #240a0a;
+      --bg-input: #2e0e0e;
+      --bg-msg-user: #6b1a1a;
+      --bg-msg-ai: #2a0c0c;
+      --accent: #7a1f1f;
+      --accent-hover: #942929;
+      --border: #4a1212;
+      --text-main: #f2e0e0;
+      --text-muted: #a67a7a;
+      --link: #d49a9a;
+      color: var(--text-main);
+    }
+    body { margin: 0; background: var(--bg-app); }
+    .app { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+    
+    aside { 
+      background: var(--bg-sidebar); 
+      padding: 20px; 
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    
+    main { 
+      padding: 24px; 
+      display: grid; 
+      grid-template-rows: auto 1fr auto; 
+      gap: 16px;
+      position: relative;
+    }
+
+    #authBox {
+      max-width: 420px;
+      margin: auto;
+      background: var(--bg-card);
+      padding: 24px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 25px rgba(0,0,0,.35);
+      grid-column: 1 / -1;
+      grid-row: 2 / 3;
+    }
+    aside .messages {
+      flex: 1;
+      overflow-y: auto;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      padding: 4px 2px;
+    }
+
+    input, button, textarea {
+      width: 100%; box-sizing: border-box; padding: 12px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: var(--bg-input); color: inherit;
+      outline: none; transition: border-color .2s, background .2s, box-shadow .2s;
+    }
+    input:focus, textarea:focus { border-color: var(--accent); background: #381212; box-shadow: 0 0 0 2px rgba(122,31,31,.25); }
+    
+    button { cursor: pointer; border: 0; background: var(--accent); color: #fff; font-weight: 700; transition: background .2s; }
+    button:hover { background: var(--accent-hover); }
+    button.secondary { background: #3d1010; }
+    
+    .card { background: var(--bg-card); border-radius: 20px; padding: 16px; box-shadow: 0 10px 25px rgba(0,0,0,.35); border: 1px solid var(--border); }
+    .row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .row > * { flex: 1; }
+    .chat-list { display: grid; gap: 8px; margin-top: 20px; }
+    .chat-item { padding: 10px; border-radius: 12px; background: rgba(255,255,255,.04); cursor: pointer; border: 1px solid transparent; transition: all .2s; }
+    .chat-item:hover { background: rgba(255,255,255,.07); border-color: var(--border); }
+    
+    .msg { max-width: 100%; padding: 14px 16px; border-radius: 18px; white-space: pre-wrap; line-height: 1.5; }
+    .user { justify-self: end; background: var(--bg-msg-user); color: #fff; border-bottom-right-radius: 4px; }
+    .assistant { justify-self: start; background: var(--bg-msg-ai); color: var(--text-main); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    
+    .muted { color: var(--text-muted); font-size: 14px; }
+    .hidden { display: none; }
+    a { color: var(--link); text-decoration: none; transition: opacity .2s; }
+    a:hover { opacity: 0.8; text-decoration: underline; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3d1010; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4f1515; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h2>LLM Chat</h2>
+    <p class="muted">by Perevoznic V.</p>
+
+    <section id="messages" class="messages"></section>
+
+    <div id="chatBox" class="hidden">
+      <button onclick="newChat()">Create new chat</button>
+      <div id="chatList" class="chat-list"></div>
+      <br>
+      <button class="secondary" onclick="logout()">Log out</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="card">
+      <h1 id="title">Hello, I am your LLM-assistant!</h1>
+      <p class="muted">Write me anything!</p>
+    </div>
+
+    <div id="authBox">
+      <input id="loginInput" placeholder="login">
+      <br><br>
+      <input id="passwordInput" placeholder="password" type="password">
+      <br><br>
+      <div class="row">
+        <button onclick="register()">Register</button>
+        <button class="secondary" onclick="login()">Login</button>
+      </div>
+      <p><a href="/api/auth/github/login">Github authentification</a></p>
+    </div>
+
+    <div class="card">
+      <textarea id="promptInput" rows="3" placeholder="Write your message here..."></textarea>
+      <br><br>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </main>
+</div>
+
+<script>
+  let accessToken = localStorage.getItem("accessToken");
+  let refreshToken = localStorage.getItem("refreshToken");
+  let currentChatId = null;
+
+  const params = new URLSearchParams(location.search);
+  if (params.get("access_token")) {
+    accessToken = params.get("access_token");
+    refreshToken = params.get("refresh_token");
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    history.replaceState({}, document.title, "/");
+  }
+
+    function authHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+    return headers;
+  }
+
+  async function api(path, options = {}) {
+    let response = await fetch(path, {
+      ...options,
+      headers: { ...(options.headers || {}), ...authHeaders() }
+    });
+
+    if (response.status === 401 && refreshToken) {
+      const refreshed = await fetch(`/api/auth/refresh?refresh_token=${refreshToken}`, { method: "POST" });
+      if (refreshed.ok) {
+        const tokens = await refreshed.json();
+        accessToken = tokens.access_token;
+        refreshToken = tokens.refresh_token;
+        localStorage.setItem("accessToken", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
+        return api(path, options);
+      } else {
+        logout();
+        throw new Error("Session time has ended. Proceed to authorization.");
+      }
+    }
+
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  }
+
+  async function register() {
+    const data = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ login: loginInput.value, password: passwordInput.value })
+    }).then(r => r.json());
+
+    saveTokens(data);
+    await loadChats();
+  }
+
+  async function login() {
+    const data = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ login: loginInput.value, password: passwordInput.value })
+    }).then(r => r.json());
+
+    saveTokens(data);
+    await loadChats();
+  }
+
+  function saveTokens(data) {
+    accessToken = data.access_token;
+    refreshToken = data.refresh_token;
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    authBox.classList.add("hidden");
+    chatBox.classList.remove("hidden");
+  }
+
+  async function loadChats() {
+    if (!accessToken) return;
+    authBox.classList.add("hidden");
+    chatBox.classList.remove("hidden");
+
+    const chats = await api("/api/chats");
+    chatList.innerHTML = "";
+    chats.forEach(chat => {
+      const div = document.createElement("div");
+      div.className = "chat-item";
+      div.textContent = chat.title;
+      div.onclick = () => openChat(chat.id);
+      chatList.appendChild(div);
+    });
+  }
+
+  async function newChat() {
+    const chat = await api("/api/chats", {
+      method: "POST",
+      body: JSON.stringify({ title: "new chat" })
+    });
+    await loadChats();
+    await openChat(chat.id);
+  }
+
+  async function openChat(id) {
+    currentChatId = id;
+    const chat = await api(`/api/chats/${id}`);
+    title.textContent = chat.title;
+    renderMessages(chat.messages);
+  }
+
+  function renderMessages(items) {
+    messages.innerHTML = "";
+    items.forEach(addMessage);
+  }
+
+  function addMessage(message) {
+    const div = document.createElement("div");
+    div.className = `msg ${message.role}`;
+    div.textContent = message.content;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage() {
+    if (!currentChatId) await newChat();
+    const text = promptInput.value.trim();
+    if (!text) return;
+
+    promptInput.value = "";
+    addMessage({ role: "user", content: text });
+
+    const assistantDiv = addMessage({ role: "assistant", content: "" });
+
+    const response = await fetch(`/api/chats/${currentChatId}/messages/stream`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ content: text })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      assistantDiv.textContent += decoder.decode(value);
+      messages.scrollTop = messages.scrollHeight;
+    }
+  }
+
+  async function logout() {
+    try {
+      if (refreshToken) {
+        await fetch(`/api/auth/logout?refresh_token=${refreshToken}`, { method: "POST" });
+      }
+    } catch (e) {
+    }
+    localStorage.clear();
+    accessToken = null;
+    refreshToken = null;
+    location.reload();
+  }
+
+  loadChats().catch(() => {});
+</script>
+</body>
+</html>

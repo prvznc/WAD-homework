@@ -1,0 +1,42 @@
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# Переменные окружения (НИКОГДА не коммитьте реальный .env)
+.env
+.env.local
+.env.*.local
+
+# IDE / Редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# БД / Кэш / Логи
+*.db
+*.sqlite3
+*.log
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Alembic (оставляем миграции, игнорируем только кэш)
+alembic/__pycache__/
+
+qwen.gguf
